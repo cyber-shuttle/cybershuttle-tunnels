@@ -1,9 +1,9 @@
 package main
 
 import (
-	"cybershuttle-tunnels/client"
-	"cybershuttle-tunnels/server"
 	"fmt"
+	"github.com/cyber-shuttle/cybershuttle-tunnels/client"
+	"github.com/cyber-shuttle/cybershuttle-tunnels/server"
 	"os"
 	"os/signal"
 	"strconv"

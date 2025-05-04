@@ -3,9 +3,9 @@ package client
 import (
 	"bytes"
 	"context"
-	"cybershuttle-tunnels/server"
 	"encoding/json"
 	"fmt"
+	"github.com/cyber-shuttle/cybershuttle-tunnels/server"
 	"io"
 	"net/http"
 	"os"
