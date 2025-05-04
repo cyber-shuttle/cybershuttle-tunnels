@@ -1,4 +1,4 @@
-module cybershuttle-tunnels
+module github.com/cyber-shuttle/cybershuttle-tunnels
 
 go 1.24.2
 
