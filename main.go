@@ -5,9 +5,9 @@ import (
 	"github.com/cyber-shuttle/cybershuttle-tunnels/client"
 	"github.com/cyber-shuttle/cybershuttle-tunnels/server"
 	"os"
-	"os/signal"
+	//"os/signal"
 	"strconv"
-	"syscall"
+	//"syscall"
 
 	"github.com/fatedier/frp/pkg/util/log"
 )
@@ -18,10 +18,18 @@ func main() {
 	cfgFilePath := os.Args[2]
 
 	if compName == "client" {
+		log.Infof(("Line before client run"))
 
-		if err := client.RunClient(cfgFilePath); err != nil {
+		err, _, errChan := client.RunClient(cfgFilePath)
+
+		if err != nil {
 			log.Errorf("frpc service for config file [%s] failed: %v", cfgFilePath, err)
 			os.Exit(1)
+		}
+		log.Infof(("Next line after client run"))
+
+		if err := <-errChan; err != nil {
+			log.Errorf("Error running server: %v", err)
 		}
 	}
 
@@ -43,9 +51,6 @@ func main() {
 	}
 
 	// Wait for interrupt signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
 
 	log.Infof("frpc service for config file [%s] stopped", cfgFilePath)
 	os.Exit(0)

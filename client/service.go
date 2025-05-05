@@ -37,7 +37,7 @@ type ClientConfig struct {
 	} `json:"log"`
 }
 
-func RunClientInternal(clientConfig *ClientConfig) error {
+func RunClientInternal(clientConfig *ClientConfig) (error, int, chan error) {
 	baseConfig := &v1.ProxyBaseConfig{}
 	baseConfig.Name = clientConfig.AgentID
 	baseConfig.Type = clientConfig.Transport.Protocol
@@ -62,7 +62,7 @@ func RunClientInternal(clientConfig *ClientConfig) error {
 	portResp, err := getAvailableServerPort(clientConfig.ServerAPI, clientConfig.AgentID)
 	if err != nil {
 		log.Errorf("Error getting available server port: %v", err)
-		return err
+		return err, 0, nil
 	}
 
 	log.Infof("Available server port: %d", portResp.Port)
@@ -72,27 +72,38 @@ func RunClientInternal(clientConfig *ClientConfig) error {
 		fmt.Printf("WARNING: %v\n", warning)
 	}
 	if err != nil {
-		return err
+		return err, 0, nil
 	}
-	return startService(commonConfig, proxyConfigs, visitorCfgs, clientConfig.ServerAPI)
+
+	errCh := make(chan error)
+
+	go func() {
+		err := startService(commonConfig, proxyConfigs, visitorCfgs, clientConfig.ServerAPI)
+		if err != nil {
+			log.Errorf("Error starting service: %v", err)
+			errCh <- err
+		}
+	}()
+
+	return nil, portResp.Port, errCh
 }
 
-func RunClient(cfgFilePath string) error {
+func RunClient(cfgFilePath string) (error, int, chan error) {
 
 	f, err := os.Open(cfgFilePath)
 	if err != nil {
-		return err
+		return err, 0, nil
 	}
 	defer f.Close()
 
 	raw, err := io.ReadAll(f)
 	if err != nil {
-		return err
+		return err, 0, nil
 	}
 
 	var cfg ClientConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return err
+		return err, 0, nil
 	}
 	return RunClientInternal(&cfg)
 }
