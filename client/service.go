@@ -37,7 +37,7 @@ type ClientConfig struct {
 	} `json:"log"`
 }
 
-func RunClientInternal(clientConfig *ClientConfig) (error, int, chan error) {
+func RunClientInternal(clientConfig *ClientConfig) (error, int, chan error, *client.Service) {
 	baseConfig := &v1.ProxyBaseConfig{}
 	baseConfig.Name = clientConfig.AgentID
 	baseConfig.Type = clientConfig.Transport.Protocol
@@ -62,7 +62,7 @@ func RunClientInternal(clientConfig *ClientConfig) (error, int, chan error) {
 	portResp, err := getAvailableServerPort(clientConfig.ServerAPI, clientConfig.AgentID)
 	if err != nil {
 		log.Errorf("Error getting available server port: %v", err)
-		return err, 0, nil
+		return err, 0, nil, nil
 	}
 
 	log.Infof("Available server port: %d", portResp.Port)
@@ -72,38 +72,36 @@ func RunClientInternal(clientConfig *ClientConfig) (error, int, chan error) {
 		fmt.Printf("WARNING: %v\n", warning)
 	}
 	if err != nil {
-		return err, 0, nil
+		return err, 0, nil, nil
 	}
 
 	errCh := make(chan error)
 
-	go func() {
-		err := startService(commonConfig, proxyConfigs, visitorCfgs, clientConfig.ServerAPI)
-		if err != nil {
-			log.Errorf("Error starting service: %v", err)
-			errCh <- err
-		}
-	}()
+	err, srv, errCh := startService(commonConfig, proxyConfigs, visitorCfgs, clientConfig.ServerAPI)
+	if err != nil {
+		log.Errorf("Error starting service: %v", err)
+		return err, 0, nil, nil
+	}
 
-	return nil, portResp.Port, errCh
+	return nil, portResp.Port, errCh, srv
 }
 
-func RunClient(cfgFilePath string) (error, int, chan error) {
+func RunClient(cfgFilePath string) (error, int, chan error, *client.Service) {
 
 	f, err := os.Open(cfgFilePath)
 	if err != nil {
-		return err, 0, nil
+		return err, 0, nil, nil
 	}
 	defer f.Close()
 
 	raw, err := io.ReadAll(f)
 	if err != nil {
-		return err, 0, nil
+		return err, 0, nil, nil
 	}
 
 	var cfg ClientConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
-		return err, 0, nil
+		return err, 0, nil, nil
 	}
 	return RunClientInternal(&cfg)
 }
@@ -113,12 +111,12 @@ func startService(
 	proxyCfgs []v1.ProxyConfigurer,
 	visitorCfgs []v1.VisitorConfigurer,
 	apiUrl string,
-) error {
+) (error, *client.Service, chan error) {
 	log.InitLogger(cfg.Log.To, cfg.Log.Level, int(cfg.Log.MaxDays), cfg.Log.DisablePrintColor)
 
 	tcp := v1.NewProxyConfigurerByType(v1.ProxyTypeTCP)
 	if tcp == nil {
-		return fmt.Errorf("failed to create TCP proxy configurer")
+		return fmt.Errorf("failed to create TCP proxy configurer"), nil, nil
 	}
 
 	svr, err := client.NewService(client.ServiceOptions{
@@ -127,10 +125,20 @@ func startService(
 		VisitorCfgs: visitorCfgs,
 	})
 	if err != nil {
-		return err
+		return err, nil, nil
 	}
 
-	return svr.Run(context.Background())
+	errCh := make(chan error)
+
+	go func() {
+		err := svr.Run(context.Background())
+		if err != nil {
+			log.Errorf("Error running server: %v", err)
+			errCh <- err
+		}
+	}()
+
+	return nil, svr, errCh
 }
 
 func getAvailableServerPort(apiUrl string, agentId string) (server.ReservePortResponse, error) {

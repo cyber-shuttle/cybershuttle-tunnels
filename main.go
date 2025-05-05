@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/cyber-shuttle/cybershuttle-tunnels/client"
 	"github.com/cyber-shuttle/cybershuttle-tunnels/server"
-	"os"
+
 	//"os/signal"
 	"strconv"
 	//"syscall"
@@ -20,14 +22,12 @@ func main() {
 	if compName == "client" {
 		log.Infof(("Line before client run"))
 
-		err, _, errChan := client.RunClient(cfgFilePath)
+		err, _, errChan, _ := client.RunClient(cfgFilePath)
 
 		if err != nil {
 			log.Errorf("frpc service for config file [%s] failed: %v", cfgFilePath, err)
 			os.Exit(1)
 		}
-		log.Infof(("Next line after client run"))
-
 		if err := <-errChan; err != nil {
 			log.Errorf("Error running server: %v", err)
 		}
